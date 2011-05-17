@@ -1,0 +1,16 @@
+package Test;
+
+message AddMsgRequest
+{
+	required uint32 iSequenceID = 1;
+	required uint32 param1 = 2; 
+	required uint32 param2 = 3;
+}
+
+message AddMsgResult
+{
+	required uint32 iSequenceID = 1;
+	required int32 error =2 ;
+	optional string errmsg =3 ;
+	optional uint32 sum = 4;
+}

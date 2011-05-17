@@ -1,0 +1,2 @@
+{u'errno': 0, u'msgQueueCode': u'3d3032b19e79446c8f70234186873c39', u'id': 12, u'method': u'OpenMsgQueue'}
+now:1305016696.237535, 0.000001 qps

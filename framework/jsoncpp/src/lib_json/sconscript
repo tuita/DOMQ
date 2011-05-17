@@ -1,0 +1,10 @@
+Import( 'env buildLibrary' )
+
+buildLibrary( env, Split( """
+    json_reader.cpp 
+    json_value.cpp 
+    json_writer.cpp
+     """ ),
+    'json' )
+
+env.AppendUnique(CCFLAGS=['-g'])
