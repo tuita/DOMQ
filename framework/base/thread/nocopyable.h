@@ -6,7 +6,6 @@ namespace base
 
 class NoCopyable
 {
-
 protected:
     NoCopyable() {}
     ~NoCopyable() {}

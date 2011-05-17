@@ -231,7 +231,7 @@ int Socket::Send(const char* p, size_t len)
     
 }
 
-int Socket::Sendn(const char* p, size_t len, unsigned int /*usec_timeout*/)
+int Socket::SendN(const char* p, size_t len, unsigned int /*usec_timeout*/)
 {
     size_t offset = 0 ;
     while (offset < len)
@@ -257,7 +257,7 @@ int Socket::Recv(char*p, size_t len)
     return ret;   
 }
 
-int Socket::Recvn(char*p, size_t len, unsigned int /*usec_timeout*/)
+int Socket::RecvN(char*p, size_t len, unsigned int /*usec_timeout*/)
 {
     size_t offset = 0 ;
     while (offset < len)
@@ -275,9 +275,9 @@ int Socket::Recvn(char*p, size_t len, unsigned int /*usec_timeout*/)
 
 void Socket::Close()
 {
-	if ( _fd != int() ) {
+	if ( _fd != -1) {
 		::close(_fd);
-		_fd = int();
+		_fd = -1;
 	}
 }
 

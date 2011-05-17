@@ -1,5 +1,5 @@
-INCLUDE_DIRECTORIES(.. ../libeventreactor ${JSON_INC} ${LIBEVENT_INC})
-link_libraries(${JSON_LIB} ${LIBEVENT_LIB})
+INCLUDE_DIRECTORIES(.. ../libeventreactor ${JSON_INC})
+link_libraries(${JSON_LIB})
 SET (LIBRARY_OUTPUT_PATH ../lib)
 
 ADD_DEFINITIONS(-g -W -Wno-deprecated -Wall -D_FILE_OFFSET_BITS=64 -DAC_HAS_INFO -DAC_HAS_WARNING -DAC_HAS_ERROR -DAC_HAS_CRITICAL)

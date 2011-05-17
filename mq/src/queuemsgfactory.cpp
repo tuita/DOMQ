@@ -3,6 +3,14 @@
 #include <string.h>
 #include <netmgr/message.h>
 #include <msg/msgqueuemsg.h>
+//ObjectPoolAllocator(size_t iInitNum, size_t iMaxNum=0, size_t iIncNum=120, IMutex * pMutex=NilMutex::Instance())
+#define  _INIT_ALLOCATE(CLASSNAME)  _##CLASSNAME(100, 0, 100, &(_mutex##CLASSNAME)),
+QueueMsgFactory::QueueMsgFactory()
+:_MSGTYPES_(_INIT_ALLOCATE)_debug(true)
+{
+
+}
+#undef _INIT_ALLOCATE
 
 std::list<std::string> QueueMsgFactory::KnownTypes() const
 {
@@ -19,25 +27,26 @@ std::list<std::string> QueueMsgFactory::KnownTypes() const
 
 }
 
-#define NAME2OBJ(x) \
-    if (strcmp(type, #x) == 0) { \
-    return new x; \
+#ifdef USEOBJECTPOOL
+#define NAME2OBJ(CLASSNAME) \
+    if (strcmp(type, #CLASSNAME) == 0) { \
+     return _##CLASSNAME.Create();\
     }
+#else 
+#define NAME2OBJ(CLASSNAME) \
+    if (strcmp(type, #CLASSNAME) == 0) { \
+    return new CLASSNAME;\
+    }
+#endif
+
 netmgr::Message* QueueMsgFactory::Create(const char* type)
 {
-    NAME2OBJ(OpenMsgQueueRequest)
-    NAME2OBJ(OpenMsgQueueResult)
-    NAME2OBJ(CloseMsgQueueRequest)
-    NAME2OBJ(CloseMsgQueueResult)
-    NAME2OBJ(GetMsgRequest)
-    NAME2OBJ(GetMsgResult)
-    NAME2OBJ(SendMsgRequest)
-    NAME2OBJ(SendMsgResult)
+    _MSGTYPES_(NAME2OBJ)
     return NULL;
 }
 #undef NAME2OBJ
 
 void QueueMsgFactory::Destroy(const netmgr::Message* msg)
 {
-    delete msg;
+    ((netmgr::Message*)msg)->Dispose();
 }

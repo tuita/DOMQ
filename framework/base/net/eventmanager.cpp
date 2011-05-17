@@ -7,10 +7,7 @@
 #include <new>
 #include <list>
 
-using std::list;
-
 namespace base {
-
 
 struct TimerData
 {
@@ -28,7 +25,7 @@ struct EventData
 {
 	event			readev;
 	event			writeev;
-	list<TimerData*>	timers;
+	std::list<TimerData*>	timers;
 
 	EventData()
 	{
@@ -37,83 +34,59 @@ struct EventData
 	}
 };
 
-
-void IEventManager::Run()
-{
-    running = true;
-    while(running)
-    {
-        if (RunOnce() != 0)
-        {
-            running = false;
-            break;
-        }
-    }
-}
-
-void __EventCb(int/* fd*/, short events, void *arg)
+void __EventCallBack(int/* fd*/, short events, void *arg)
 {
 	EventHandler* handler = static_cast<EventHandler*>(arg);
 	assert(handler);
 
-	if (events & EV_TIMEOUT) {
+	if (events & EV_TIMEOUT) 
+    {
 		handler->HandleTimeout(NULL);
 	}
-	else if (events & EV_READ) {
+	else if (events & EV_READ) 
+    {
 		handler->HandleInput();
 	}
-	else if (events & EV_WRITE) {
+	else if (events & EV_WRITE) 
+    {
 		handler->HandleOutput();
 	}
 }
 
-void __EventCb4Timer(int/* fd*/, short events, void *arg)
+void __TimeEventCallBack(int/* fd*/, short events, void *arg)
 {
-	if ( ! (events & EV_TIMEOUT) ) {
+	if ( ! (events & EV_TIMEOUT) ) 
+    {
 		return;
 	}
 
 	void ** argv = static_cast<void **>(arg);
-	assert(argv!=NULL);
-	
 	EventHandler* handler = static_cast<EventHandler*>(argv[0]);
-	assert(handler);
-
 	TimerData* pTimerData = static_cast<TimerData*>(argv[1]);
-	assert(pTimerData);
-
-	// delete timer from handler
-	EventData* ed = static_cast<EventData*>(handler->Context());
-	assert(ed);
-	
-
-	// call handler
 	handler->HandleTimeout(pTimerData);
-
-	handler->GetEventManager()->CancelTimer(handler, pTimerData);
+	handler->GetEventManager()->RemoveTimeHandler(handler, pTimerData);
 }
 
-EventManager::EventManager(IMemoryAllocator* allocator_)
-: _allocator(allocator_)
+EventManager::EventManager(IMemoryAllocator* allocator)
+: _allocator(allocator)
 {
 	_eventBase = static_cast<event_base*>(event_init());
 }
 
 EventManager::~EventManager()
 {
-	
 }
 
 int EventManager::initEventHandler(EventHandler* handler)
 {
-	if ( handler->Context() == NULL ) 
+	if(handler->Context() == NULL ) 
     {
-		EventData* ed = AllocEventData();
-		if ( ed == NULL ) 
+		EventData* eventdata = AllocEventData();
+		if ( eventdata == NULL ) 
         {
 			return -1;
 		}
-		handler->Context(ed);
+		handler->Context(eventdata);
 	}
 
 	handler->SetEventManager(this);	
@@ -127,9 +100,9 @@ void EventManager::uninitEventHander(EventHandler* handler, EventData* ed)
 	handler->HandleClose();		
 }
 
-bool EventManager::containEvent(EventData* ed)
+bool EventManager::containEvent(EventData* eventdata)
 {
-	return (ed->readev.ev_events | ed->writeev.ev_events) || !ed->timers.empty();
+	return (eventdata->readev.ev_events | eventdata->writeev.ev_events) || !eventdata->timers.empty();
 }
 
 int EventManager::RegisterHandler(int mask, EventHandler* handler, timeval* timeout)
@@ -144,9 +117,8 @@ int EventManager::RegisterHandler(int mask, EventHandler* handler, timeval* time
 		events |= EV_READ;
 		if (timeout) events |= EV_TIMEOUT;
 		if (mask & PersistMask)	events |= EV_PERSIST;
-		
 		event_del(&ed->readev);
-		event_set(&ed->readev, handler->GetEventObject().GetObject(), events, __EventCb, handler);
+		event_set(&ed->readev, handler->GetEventObject().GetObject(), events, __EventCallBack, handler);
 		event_base_set(_eventBase, &ed->readev);
 		if (event_add(&ed->readev, timeout) != 0)
         {
@@ -161,7 +133,7 @@ int EventManager::RegisterHandler(int mask, EventHandler* handler, timeval* time
 		if (timeout) events |= EV_TIMEOUT;
 		if (mask & PersistMask) events |= EV_PERSIST;		
 		event_del(&ed->writeev);
-		event_set(&ed->writeev, handler->GetEventObject().GetObject(), events, __EventCb, handler);
+		event_set(&ed->writeev, handler->GetEventObject().GetObject(), events, __EventCallBack, handler);
 		event_base_set(_eventBase, &ed->writeev);
 		if (event_add(&ed->writeev, timeout) != 0) 
         {
@@ -191,88 +163,86 @@ int EventManager::RemoveHandler(int mask, EventHandler* handler)
 		event_del(&ed->writeev);
 		memset(&ed->writeev, 0, sizeof(ed->writeev));
 	}
-
-	if ( !containEvent(ed) ) {
+	if ( !containEvent(ed) ) 
+    {
 		uninitEventHander(handler, ed);
 	}
-
 	return 0;
 }
 
-int EventManager::ScheduleTimer(EventHandler* handler, timeval* timeout, void ** pTimerID)
+int EventManager::RegisterTimeHandler(EventHandler* handler, timeval* timeout, void ** pTimerID)
 {
-	if ( timeout == NULL ) {
-		return -1;
-	}
-
+	if ( timeout == NULL ) return -1;
 	initEventHandler(handler);
-
 	EventData* ed = static_cast<EventData*>(handler->Context());
-	assert(ed!=NULL);
-
 	TimerData * pTimerData = new TimerData;
-	if ( pTimerData == NULL ) {
-		return -1;
-	}
-	
-	pTimerData->argv[0] = handler;
+	if ( pTimerData == NULL ) return -1;
+
+    pTimerData->argv[0] = handler;
 	pTimerData->argv[1] = pTimerData;
 	
-	evtimer_set(&pTimerData->timer, __EventCb4Timer, &pTimerData->argv);
+	evtimer_set(&pTimerData->timer, __TimeEventCallBack, &pTimerData->argv);
 	event_base_set(_eventBase, &pTimerData->timer);
-	if ( evtimer_add(&pTimerData->timer, timeout) != 0 ) {
+	if ( evtimer_add(&pTimerData->timer, timeout) != 0 ) 
+    {
 		delete pTimerData;
 		return -1;
 	}
 
 	ed->timers.push_back(pTimerData);
-	if ( pTimerID ) {
+	if ( pTimerID ) 
+    {
 		*pTimerID = pTimerData;
 	}
 	
 	return 0;
 }
 
-int EventManager::CancelTimer(EventHandler* handler, void * pTimerID)
+int EventManager::RemoveTimeHandler(EventHandler* handler, void * timeid)
 {
-	EventData* ed = static_cast<EventData*>(handler->Context());
-	if (!ed)
+	EventData* eventdata = static_cast<EventData*>(handler->Context());
+	if (!eventdata)
 	{
 		handler->HandleClose();
 		return 0;
 	}
 
-	if ( pTimerID == NULL ) {
-		for ( list<TimerData *>::const_iterator pos=ed->timers.begin(); pos!=ed->timers.end(); ++pos ) {
-			event_del(&(*pos)->timer);
-			delete *pos;
+	if ( timeid == NULL ) 
+    {
+		for(std::list<TimerData *>::const_iterator it=eventdata->timers.begin(); it!=eventdata->timers.end(); ++it ) 
+        {
+			event_del(&(*it)->timer);
+			delete *it;
 		}
-		ed->timers.clear();
+		eventdata->timers.clear();
 	}
-	else {
-		TimerData* pTimerData = static_cast<TimerData *>(pTimerID);
-
-		list<TimerData*>::iterator pos = ed->timers.begin();
-		for ( ; pos!=ed->timers.end(); ++pos ) {
-
-			if ( *pos == pTimerData ) {
+	else 
+    {
+		TimerData* pTimerData = static_cast<TimerData *>(timeid);
+        std::list<TimerData*>::iterator pos;
+		for(pos = eventdata->timers.begin(); pos!=eventdata->timers.end(); ++pos ) 
+        {
+			if ( *pos == pTimerData ) 
+            {
 				break;
 			}
 		}
-		if ( pos == ed->timers.end() ) {
+		if( pos == eventdata->timers.end() ) 
+        {
 			return -1;
 		}
 
-		if ( event_del(&pTimerData->timer) != 0 ) {
+		if ( event_del(&pTimerData->timer) != 0 ) 
+        {
 			return -1;
 		}
-		
-		ed->timers.erase(pos);
+		eventdata->timers.erase(pos);
 		delete pTimerData;
 	}
 
-	if ( !containEvent(ed) ) {
-		uninitEventHander(handler, ed);
+	if(!containEvent(eventdata) ) 
+    {
+		uninitEventHander(handler, eventdata);
 	}
 
 	return 0;
@@ -313,5 +283,5 @@ void EventManager::Stop()
 	event_base_loopexit(_eventBase, 0);
 }
 
-} // namespace base
+}
 

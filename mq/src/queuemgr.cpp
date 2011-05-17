@@ -27,7 +27,7 @@
         for(int i=0; i< int(_GETALLREPLYRETURN); ++i)\
             {\
             if(REDIS_OK != _REDISCON->GetReply(_tmpReply)) break;\
-            BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, *_REDISCON, _tmpReply);\
+            BASE_BLOCK_GUARD(&RedisConnector::FreeReply, *_REDISCON, _tmpReply);\
             }\
         }\
         if(ret != 0) return ret;\
@@ -74,7 +74,7 @@ void QueueMgr::Close()
 int QueueMgr::CreatePublisher(RedisConnector& con, const QueueOption& option, int create, const std::string& /*addr*/)
 {
     RedisReply* reply = con.Command("%s %s %s", RedisCmd::SISMEMBER.c_str(), QueueMetaData::allQueueName.c_str(), option.msgQueueName.c_str());
-    BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, con, reply);
+    BASE_BLOCK_GUARD(&RedisConnector::FreeReply, con, reply);
     _CHECK_REPLY((&con), reply, REDIS_REPLY_INTEGER, -1, true, 0, "[%s %s %s]", RedisCmd::SISMEMBER.c_str(), QueueMetaData::allQueueName.c_str(), option.msgQueueName.c_str());
     if (reply->integer == 0)
     {
@@ -97,7 +97,7 @@ int QueueMgr::CreatePublisher(RedisConnector& con, const QueueOption& option, in
                     LOG_ERROR("create publish error");
                     return MsgQueueErrorNo::INTERNAL_ERROR; 
                 }
-                BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, con, reply);
+                BASE_BLOCK_GUARD(&RedisConnector::FreeReply, con, reply);
             }
         }
         else
@@ -125,13 +125,13 @@ int QueueMgr::CreateSubscriber(RedisConnector& con, const QueueOption& option,co
     }
     else
     {
-        BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, con, reply);
+        BASE_BLOCK_GUARD(&RedisConnector::FreeReply, con, reply);
         _CHECK_REPLY((&con), reply, REDIS_REPLY_INTEGER, -1, true, 1, "[%s %s %s]", RedisCmd::SISMEMBER.c_str(), QueueMetaData::allQueueName.c_str(), option.msgQueueName.c_str());
         if(reply->integer != 1)
         {
             if( REDIS_OK == con.GetReply(reply))
             {
-                BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, con, reply);
+                BASE_BLOCK_GUARD(&RedisConnector::FreeReply, con, reply);
             }
             LOG_DEBUG("redis cmd:[%s %s %s]", RedisCmd::SISMEMBER.c_str(), QueueMetaData::allQueueName.c_str(), option.msgQueueName.c_str());
             return MsgQueueErrorNo::NO_EXIST;
@@ -148,7 +148,7 @@ int QueueMgr::CreateSubscriber(RedisConnector& con, const QueueOption& option,co
     //获取已有队列远信息
     Queue queue;
     {
-        BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, con, reply);
+        BASE_BLOCK_GUARD(&RedisConnector::FreeReply, con, reply);
         _CHECK_REPLY((&con), reply, REDIS_REPLY_ARRAY, -1, true, 0, "[%s %s]", RedisCmd::HGETALL.c_str(), QueueMetaData::GetQueueMetaName(option.msgQueueName).c_str());
 
         if (0 != GetQueueValue(queue, *reply))
@@ -174,7 +174,7 @@ int QueueMgr::CreateSubscriber(RedisConnector& con, const QueueOption& option,co
     {
         reply = con.Command("%s %s %s", RedisCmd::HEXISTS.c_str(), QueueMetaData::GetSubQueueMetaName(option.msgQueueName).c_str(), clientName.c_str());
         _CHECK_REPLY((&con), reply, REDIS_REPLY_INTEGER, -1, true, 0, "[%s %s %s]", RedisCmd::HEXISTS.c_str(), QueueMetaData::GetSubQueueMetaName(option.msgQueueName).c_str(), clientName.c_str());
-        BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, con, reply);
+        BASE_BLOCK_GUARD(&RedisConnector::FreeReply, con, reply);
         if (reply->integer == 1) //create
         {
             return MsgQueueErrorNo::SUCCESS;
@@ -184,8 +184,8 @@ int QueueMgr::CreateSubscriber(RedisConnector& con, const QueueOption& option,co
     {
         reply = con.Command("%s %s %s %zd", RedisCmd::HMSET.c_str(), QueueMetaData::GetSubQueueMetaName(option.msgQueueName).c_str(), clientName.c_str(), time(NULL));
         _CHECK_REPLY((&con), reply, REDIS_REPLY_STATUS, -1, true, 0, "[%s %s %s %ld]", RedisCmd::HMSET.c_str(), QueueMetaData::GetSubQueueMetaName(option.msgQueueName).c_str(), clientName.c_str(), time(NULL));
-        BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, con, reply);
-        base::LockGuard lock(&_rwMutex);
+        BASE_BLOCK_GUARD(&RedisConnector::FreeReply, con, reply);
+        base::MutexGuard lock(&_rwMutex);
         assert(0 == lock.Lock());
         Queue::SubQueue subQueue = {clientName, 0, time(NULL)};
         _name2Queue[option.msgQueueName].clients.push_back(subQueue);
@@ -214,7 +214,7 @@ int QueueMgr::OpenQueue(const QueueOption& option, QueueRole role, int create, c
     };
     if (MsgQueueErrorNo::SUCCESS == ret)
     {
-        base::LockGuard lock(&_rwMutex);
+        base::MutexGuard lock(&_rwMutex);
         lock.Lock();
         msgQueueCode = GenMsgQueueCode();
         tagMsgCodeSeqItem seqItem;
@@ -250,7 +250,7 @@ int QueueMgr::OpenQueue(const QueueOption& option, QueueRole role, int create, c
 
 int QueueMgr::CloseQueue(const std::string& msgQueueCode)
 {
-    base::LockGuard lock(&_rwMutex);
+    base::MutexGuard lock(&_rwMutex);
     lock.Lock();
     QUEUECODE2QUEUENAME::iterator it = _msgQueueCode2QueueName.find(msgQueueCode);
     if (it == _msgQueueCode2QueueName.end())
@@ -353,7 +353,7 @@ int QueueMgr::LoadQueues(RedisConnector& con)
 {
     //获取所有队列的元数据信息
     RedisReply* reply = con.Command("%s %s", RedisCmd::SMEMBERS.c_str(), QueueMetaData::allQueueName.c_str());
-    BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, con, reply);
+    BASE_BLOCK_GUARD(&RedisConnector::FreeReply, con, reply);
     _CHECK_REPLY((&con), reply, REDIS_REPLY_ARRAY, -1, false, 0, "%s %s", RedisCmd::SMEMBERS.c_str(), QueueMetaData::allQueueName.c_str());
 
 
@@ -384,7 +384,7 @@ int QueueMgr::LoadQueues(RedisConnector& con)
             LOG_ERROR("get queue[%s] meta data error, redis cmd:[%s %s]", queueMetaName.c_str(), RedisCmd::HGETALL.c_str(), queueMetaName.c_str());
             return -1;
         }
-        BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, con, allFieldReply);
+        BASE_BLOCK_GUARD(&RedisConnector::FreeReply, con, allFieldReply);
         _CHECK_REPLY((&con), allFieldReply, REDIS_REPLY_ARRAY, -1, true, 1, "[%s %s]", RedisCmd::HGETALL.c_str(), queueMetaName.c_str());
 
         RedisReply* queueCountReply;
@@ -393,7 +393,7 @@ int QueueMgr::LoadQueues(RedisConnector& con)
             LOG_ERROR("get queue[%s] count error, [%s %s]", queueMsgName.c_str(), RedisCmd::LLEN.c_str(), queueMsgName.c_str());
             return -1;
         }
-        BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, con, queueCountReply);
+        BASE_BLOCK_GUARD(&RedisConnector::FreeReply, con, queueCountReply);
         _CHECK_REPLY((&con), queueCountReply, REDIS_REPLY_INTEGER, -1, true, 0, "[%s %s]", RedisCmd::LLEN.c_str(), queueMsgName.c_str());
 
         Queue& queue = name2QueueTmp[tmp->str];
@@ -413,7 +413,7 @@ int QueueMgr::LoadQueues(RedisConnector& con)
                 LOG_ERROR("get submsgqueue:[%s] error, redis cmd:[%s %s]", queue.option.msgQueueName.c_str(), RedisCmd::HGETALL.c_str(), subQueueMetaName.c_str());
                 return -1;
             }
-            BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, con, subReply);
+            BASE_BLOCK_GUARD(&RedisConnector::FreeReply, con, subReply);
             _CHECK_REPLY((&con), subReply, REDIS_REPLY_ARRAY, -1, false, 0, "[%s %s]", RedisCmd::HGETALL.c_str(), subQueueMetaName.c_str());
             if (subReply->type == REDIS_REPLY_NIL)
             {
@@ -444,13 +444,13 @@ int QueueMgr::LoadQueues(RedisConnector& con)
                     LOG_ERROR("get subqueue:[%s] count error, redis cmd:[%s %s]", subQueueName.c_str(), RedisCmd::LLEN.c_str(), subQueueName.c_str());
                     return -1;
                 }
-                BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, con, getSubCountReply);
+                BASE_BLOCK_GUARD(&RedisConnector::FreeReply, con, getSubCountReply);
                 _CHECK_REPLY((&con), getSubCountReply, REDIS_REPLY_INTEGER, -1, true, queue.clients.size()-i-1, "[%s %s]", RedisCmd::LLEN.c_str(), subQueueName.c_str());
                 queue.clients[i].msgCount = getSubCountReply->integer;
             }
         }
     }
-    base::LockGuard lock(&_rwMutex);
+    base::MutexGuard lock(&_rwMutex);
     assert(lock.Lock() == 0);
     _name2Queue.swap(name2QueueTmp);
     return 0;
@@ -464,7 +464,7 @@ int QueueMgr::PopMsg(const std::string& msgQueueCode, QueueMsg& msg)
     int msgType ; 
     int ret = 0; 
     {
-        base::LockGuard lock(&_rwMutex);
+        base::MutexGuard lock(&_rwMutex);
         assert(lock.Lock()==0);
         ret = GetQueueName(msgQueueCode, queueName, clientName);
         if(0 != ret)
@@ -505,7 +505,7 @@ int QueueMgr::PopMsg(const std::string& msgQueueCode, QueueMsg& msg)
         LOG_ERROR("pop msgqueue[%s] error", queueName.c_str());
         return MsgQueueErrorNo::INTERNAL_ERROR;
     }
-    BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, *con, reply);
+    BASE_BLOCK_GUARD(&RedisConnector::FreeReply, *con, reply);
     _CHECK_REPLY(con, reply, REDIS_REPLY_STRING, -1, true, 1, "[%s %s]", RedisCmd::LPOP.c_str(), queueMsgName.c_str());
 
     RedisReply* updateLastVisitReply = NULL;
@@ -513,7 +513,7 @@ int QueueMgr::PopMsg(const std::string& msgQueueCode, QueueMsg& msg)
     {
         LOG_ERROR("pop msgqueue[%s] error", queueName.c_str());
     }
-    BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, *con, updateLastVisitReply);
+    BASE_BLOCK_GUARD(&RedisConnector::FreeReply, *con, updateLastVisitReply);
     _CHECK_REPLY(con, updateLastVisitReply, REDIS_REPLY_INTEGER, -1, true, 0, "[%s %s %s %ld]", RedisCmd::HSET.c_str(), queueMetaName.c_str(), timeProperty.c_str(), now);
 
     if (msg.Unserialize(reply->str, reply->len) < 0)
@@ -534,7 +534,7 @@ int QueueMgr::PushMsg(const std::string& msgQueueCode, const QueueMsg& msg)
     assert(listBuf);
     int ret = 0;
     {
-        base::LockGuard lock(&_rwMutex);
+        base::MutexGuard lock(&_rwMutex);
         assert(lock.Lock()==0);
         ret = GetQueueName(msgQueueCode, queueName, clientName);
         if(0 != ret)
@@ -596,7 +596,7 @@ int QueueMgr::PushMsg(const std::string& msgQueueCode, const QueueMsg& msg)
             LOG_ERROR("push msgqueue[%s] error, msg:[%s]", queueName.c_str(), msg.data.c_str());
             return MsgQueueErrorNo::INTERNAL_ERROR;
         }
-        BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, *con, pushReply);
+        BASE_BLOCK_GUARD(&RedisConnector::FreeReply, *con, pushReply);
         _CHECK_REPLY(con, pushReply, REDIS_REPLY_INTEGER, -1, true, --totalReply, "%s", "pushmsg");
 
         RedisReply* updateVisitRelpy=NULL;
@@ -605,7 +605,7 @@ int QueueMgr::PushMsg(const std::string& msgQueueCode, const QueueMsg& msg)
             LOG_ERROR("push msgqueue[%s] error, msg:[%s]", queueName.c_str(), msg.data.c_str());
             return MsgQueueErrorNo::INTERNAL_ERROR;
         }
-        BASE_ON_BLOCK_EXIT(&RedisConnector::FreeReply, *con, updateVisitRelpy);
+        BASE_BLOCK_GUARD(&RedisConnector::FreeReply, *con, updateVisitRelpy);
         _CHECK_REPLY(con, updateVisitRelpy, REDIS_REPLY_INTEGER, -1, true, --totalReply, "%s", "updatelastvisit");
         LOG_DEBUG("push msg succ");
         ++i;
@@ -649,7 +649,7 @@ std::string QueueMgr::GenMsgQueueCode()
 
 void QueueMgr::RemoveExpireMsgQueueCode(time_t expireTime)
 {
-    base::LockGuard lock(&_rwMutex);
+    base::MutexGuard lock(&_rwMutex);
     assert(lock.Lock() == 0);
     MSGCODESEQUENCE::reverse_iterator it;
     int i =0; 
@@ -683,7 +683,7 @@ void QueueMgr::RemoveExpireMsgQueueCode(time_t expireTime)
 
 void QueueMgr::RemoveExpireQueue(time_t /*expireTime*/)
 {
-    base::LockGuard lock(&_rwMutex);
+    base::MutexGuard lock(&_rwMutex);
     lock.Lock();
     for (NAME2QUEUE::iterator it = _name2Queue.begin(); it != _name2Queue.end(); ++it)
     {
@@ -693,7 +693,7 @@ void QueueMgr::RemoveExpireQueue(time_t /*expireTime*/)
 
 void QueueMgr::GetClients(const std::vector<std::string> msgCodes, std::vector<QueueClient>& clientInfos) const
 {
-    base::LockGuard lock(&_rwMutex);
+    base::MutexGuard lock(&_rwMutex);
     assert(lock.Lock() == 0);
 
     for (std::vector<std::string>::const_iterator it = msgCodes.begin(); it != msgCodes.end(); ++it)
@@ -723,7 +723,7 @@ void QueueMgr::Ping()
 
 int QueueMgr::GetAllQueue(std::vector<Queue>& queues)
 {
-    base::LockGuard lock(&_rwMutex);
+    base::MutexGuard lock(&_rwMutex);
     assert(lock.Lock() == 0);
     for (NAME2QUEUE::const_iterator it = _name2Queue.begin(); it != _name2Queue.end(); ++it)
     {

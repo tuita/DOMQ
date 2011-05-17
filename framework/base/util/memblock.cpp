@@ -25,7 +25,7 @@ MemBlock::MemBlock(size_t iSize, IMemoryAllocator *pAllocator)
 MemBlock::MemBlock(const MemBlock & memBlock)
 {
 	_allocator = memBlock._allocator;
-	size_t iCapacity = memBlock.GetCapacity();
+	size_t iCapacity = memBlock.TotalSpace();
 	_begin = (char*)_allocator->Create(iCapacity);
 	if ( _begin == NULL ) 
     {
@@ -34,7 +34,7 @@ MemBlock::MemBlock(const MemBlock & memBlock)
 
 	_end = _begin;
 	_blockEnd = _begin + iCapacity;
-	Append(memBlock.GetBegin(), memBlock.GetSize());
+	Append(memBlock._begin, memBlock.Size());
 }
 
 MemBlock::~MemBlock()
@@ -62,47 +62,48 @@ void MemBlock::Swap(MemBlock & memBlock)
 
 int MemBlock::Resize(size_t iSize)
 {
-	if ( iSize <= GetCapacity() ) 
+	if ( iSize <= TotalSpace() ) 
     {
-		if ( GetBegin() + iSize < GetEnd() ) 
+		if ( _begin + iSize < _end ) 
         {
-			_end = GetBegin() + iSize;
+			_end = _begin + iSize;
 		}		
 		return 0;
 	}
 
 	MemBlock memBlockTmp(iSize, _allocator);
-	if ( !memBlockTmp.IsInit() ) 
+	if ( !memBlockTmp.GetBegin()) 
     {
 		return -1;
 	}
 	
-	if ( memBlockTmp.Append(GetBegin(), ::std::min(GetSize(), iSize)) != 0 ) 
+	if ( memBlockTmp.Append(_begin, ::std::min(Size(), iSize)) != 0 ) 
     {
 		return -1;
 	}
 	
 	this->Swap(memBlockTmp);
+
 	return 0;
 }
 
 
-int MemBlock::Copy(char* pDestBuffer, const char* pSrcBuffer, size_t iSize)
+int MemBlock::Copy(const char* pDestBuffer, const char* pSrcBuffer, size_t iSize)
 {
-	ssize_t iDestOffset = pDestBuffer - GetBegin();
+	ssize_t iDestOffset = pDestBuffer - _begin;
 
-	if ( pDestBuffer < GetBegin() ||  pDestBuffer > GetEnd() ) {
+	if ( pDestBuffer < _begin ||  pDestBuffer > _end ) {
 		return -1;
 	}
 
-	ssize_t iSrcOffset = pSrcBuffer - GetBegin();
+	ssize_t iSrcOffset = pSrcBuffer - _begin;
 	size_t iDestSize = iDestOffset + iSize;
-	ssize_t iIncSize = iDestSize - GetSize();
+	ssize_t iIncSize = iDestSize - Size();
 	if ( iIncSize < 0 ) {
 		iIncSize = 0;
 	}
 
-	if ( iDestSize > GetCapacity() ) 
+	if ( iDestSize > TotalSpace() ) 
     {
 		if ( Resize(iDestSize) != 0 ) 
         {
@@ -110,52 +111,52 @@ int MemBlock::Copy(char* pDestBuffer, const char* pSrcBuffer, size_t iSize)
 		}
 	}
 
-	if ( iSrcOffset >= 0  && (size_t)iSrcOffset < GetSize() ) 
+	if ( iSrcOffset >= 0  && (size_t)iSrcOffset < Size() ) 
     {
-		memmove(GetBegin()+iDestOffset, GetBegin()+iSrcOffset, iSize);
+		memmove(_begin+iDestOffset, _begin+iSrcOffset, iSize);
 	}
 	else 
     {		
-		memcpy(GetBegin()+iDestOffset, pSrcBuffer, iSize);
+		memcpy(_begin+iDestOffset, pSrcBuffer, iSize);
 	}
 
-	return IncEnd(iIncSize);
+	return AddSpace(iIncSize);
 }
 
-int MemBlock::Erase(char* pBegin, char* pEnd)
-{
+//int MemBlock::Erase(char* pBegin, char* pEnd)
+//{
+//	
+//
+//	if ( pBegin == pEnd ) {
+//		return 0;
+//	}
+//
+//	if ( pBegin > pEnd ) {
+//		return -1;
+//	}
+//
+//	if ( pBegin < _begin || pEnd > _end ) 
+//    {
+//		return -1;
+//	}
+//
+//	if ( pBegin == _begin && pEnd == _end ) 
+//    {
+//		Clear();
+//		return 0;
+//	}
+//
+//	if ( Copy(pBegin, pEnd, _end-pEnd) != 0 ) 
+//    {
+//		return -1;
+//	}
+//
+//	return DecEnd(pEnd-pBegin);
+//}
 	
-
-	if ( pBegin == pEnd ) {
-		return 0;
-	}
-
-	if ( pBegin > pEnd ) {
-		return -1;
-	}
-
-	if ( pBegin < GetBegin() || pEnd > GetEnd() ) 
-    {
-		return -1;
-	}
-
-	if ( pBegin == GetBegin() && pEnd == GetEnd() ) 
-    {
-		Clear();
-		return 0;
-	}
-
-	if ( Copy(pBegin, pEnd, GetEnd()-pEnd) != 0 ) 
-    {
-		return -1;
-	}
-
-	return DecEnd(pEnd-pBegin);
-}
-	
-int MemBlock::IncEnd(size_t iSize)
+int MemBlock::AddSpace(size_t iSize)
 {
-	if ( iSize > GetAvailable() ) 
+	if ( iSize > FreeSpace() ) 
     {		
 		return -1;
 	}
@@ -163,9 +164,9 @@ int MemBlock::IncEnd(size_t iSize)
 	return 0;
 }
 
-int MemBlock::DecEnd(size_t iSize)
+int MemBlock::ReduceSpace(size_t iSize)
 {
-	if ( iSize > GetSize() ) 
+	if ( iSize > Size() ) 
     {
 		return -1;
 	}

@@ -44,7 +44,7 @@ int NetMgrEventHandler::Close()
 void NetMgrEventHandler::HandleInput()
 {
 	const int RECV_SIZE = 16384;
-	size_t pos = _recvbuffer.GetSize();
+	size_t pos = _recvbuffer.Size();
 	_recvbuffer.Resize(pos + RECV_SIZE);
 	
 	int ret = ::recv(GetEventObject().GetObject(), _recvbuffer.GetBegin() + pos, RECV_SIZE, 0);
@@ -68,21 +68,21 @@ void NetMgrEventHandler::HandleInput()
 	else
 	{
         LOG_DEBUG("netinfo, recv data:[%s] from src:[%s]", base::Escape(_recvbuffer.GetBegin(), ret).c_str(), _peerAddr.ToString().c_str());
-		_recvbuffer.IncEnd(ret);
+		_recvbuffer.AddSpace(ret);
         ICoder* coder = _networkOption->coder;
         assert(coder);
-		int usecount = coder->Extract(_recvbuffer.GetBegin(), _recvbuffer.GetSize(), _peerAddr);
+		int usecount = coder->Extract(_recvbuffer.GetBegin(), _recvbuffer.Size(), _peerAddr);
 		if (usecount < 0) 
         {
-            LOG_WARN("Extract package fail,data:[%s], client:[%s]", base::Escape(_recvbuffer.GetBegin(), _recvbuffer.GetSize()).c_str(), _peerAddr.ToString().c_str());
+            LOG_WARN("Extract package fail,data:[%s], client:[%s]", base::Escape(_recvbuffer.GetBegin(), _recvbuffer.Size()).c_str(), _peerAddr.ToString().c_str());
 			Close();
 		}
 		else
 		{
 			if (usecount > 0)
 			{
-				_recvbuffer.Copy(_recvbuffer.GetBegin(), _recvbuffer.GetBegin() + usecount, _recvbuffer.GetSize() - usecount);
-				_recvbuffer.DecEnd(usecount);
+				_recvbuffer.Copy(_recvbuffer.GetBegin(), _recvbuffer.GetBegin() + usecount, _recvbuffer.Size() - usecount);
+				_recvbuffer.ReduceSpace(usecount);
 			}
 			timeval tv = {_networkOption->timeout/1000, _networkOption->timeout%1000*1000};
             if (GetEventManager()->RegisterHandler(base::ReadMask, this, &tv) == -1)
@@ -96,12 +96,12 @@ void NetMgrEventHandler::HandleInput()
 
 void NetMgrEventHandler::HandleOutput()
 {
-	if (_sendbuffer.GetSize() <= 0)
+	if (_sendbuffer.Size() <= 0)
     {
 		return;
     }
 
-	int ret = ::send(GetEventObject().GetObject(), _sendbuffer.GetBegin(), _sendbuffer.GetSize(), MSG_DONTWAIT);
+	int ret = ::send(GetEventObject().GetObject(), _sendbuffer.GetBegin(), _sendbuffer.Size(), MSG_DONTWAIT);
 	if (ret == 0)
 	{
         LOG_ERROR("Send failed: client[%s] disconnectd", _peerAddr.ToString().c_str());
@@ -131,17 +131,17 @@ void NetMgrEventHandler::HandleOutput()
 	else
 	{
         LOG_DEBUG("netinfo, send data:[%s] to dest:[%s] succ", base::Escape(_sendbuffer.GetBegin(), ret).c_str(), _peerAddr.ToString().c_str());
-		if ((size_t)ret == _sendbuffer.GetSize())
+		if ((size_t)ret == _sendbuffer.Size())
 		{
 			_sendbuffer.Clear();
 		}
 		else
 		{
-			_sendbuffer.Copy(_sendbuffer.GetBegin(), _sendbuffer.GetBegin() + ret, _sendbuffer.GetSize() - ret);
-			_sendbuffer.Resize(_sendbuffer.GetSize() - ret);
+			_sendbuffer.Copy(_sendbuffer.GetBegin(), _sendbuffer.GetBegin() + ret, _sendbuffer.Size() - ret);
+			_sendbuffer.Resize(_sendbuffer.Size() - ret);
 		}
 
-		if (_sendbuffer.IsEmpty())
+		if (_sendbuffer.Empty())
 		{
                 LOG_DEBUG("netinfo, send data finish, dest:[%s]", _peerAddr.ToString().c_str());
                 GetEventManager()->RemoveHandler(base::WriteMask, this);

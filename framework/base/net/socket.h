@@ -51,12 +51,11 @@ public:
 
 	int Send(const char* p, size_t len);
 
-	int Sendn(const char* p, size_t len, unsigned int usec_timeout);
+	int SendN(const char* p, size_t len, unsigned int usec_timeout);
 
 	int Recv(char* p, size_t len);
     
-    int Recvn(char*p, size_t len, unsigned int usec_timeout);
-
+    int RecvN(char*p, size_t len, unsigned int usec_timeout);
 
 	void Close();
 

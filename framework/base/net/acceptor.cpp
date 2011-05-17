@@ -16,11 +16,11 @@ namespace base
 Acceptor::Acceptor()
 {
 }
-
-Acceptor::Acceptor(int fd)
-{
-	GetEventObject().SetObject(fd);
-}
+//
+//Acceptor::Acceptor(int fd)
+//{
+//	GetEventObject().SetObject(fd);
+//}
 
 Acceptor::Acceptor(const SockAddress & stSockAddr)
 	: _addr(stSockAddr)
@@ -34,39 +34,39 @@ Acceptor::~Acceptor()
 int Acceptor::Open()
 {
 	bool newSocket = false;
-	if (!this->GetEventObject().IsValid()) 
+	if(!this->GetEventObject().IsValid()) 
     {
 		Socket listenSocket;
 
-		if (_addr.GetFamily() == AF_LOCAL || _addr.GetFamily() == AF_FILE) 
+		if(_addr.GetFamily() == AF_LOCAL || _addr.GetFamily() == AF_FILE) 
         {
 			::remove(_addr.ToString().c_str());
 		}
 
-		if (listenSocket.Create(_addr.GetFamily(), SOCK_STREAM, 0) != 0) 
+		if(listenSocket.Create(_addr.GetFamily(), SOCK_STREAM, 0) != 0) 
         {
 			return -1;
 		}
 
-		if (listenSocket.SetBlocking(false) != 0) 
-        {
-			listenSocket.Close();
-			return -1;
-		}
-
-		if (_addr.GetFamily() == AF_INET && listenSocket.SetDelay(false) != 0) 
+		if(listenSocket.SetBlocking(false) != 0) 
         {
 			listenSocket.Close();
 			return -1;
 		}
 
-		if (listenSocket.Bind(_addr.Getsockaddr(), _addr.Getsockaddrlen()) != 0) 
+		if(_addr.GetFamily() == AF_INET && listenSocket.SetDelay(false) != 0) 
         {
 			listenSocket.Close();
 			return -1;
 		}
 
-		if (listenSocket.Listen(1024) != 0) 
+		if(listenSocket.Bind(_addr.Getsockaddr(), _addr.Getsockaddrlen()) != 0) 
+        {
+			listenSocket.Close();
+			return -1;
+		}
+
+		if(listenSocket.Listen(1024) != 0) 
         {
 			listenSocket.Close();
 			return -1;
@@ -79,22 +79,22 @@ int Acceptor::Open()
     {
 		Socket listensock(GetEventObject().GetObject());
 
-		if (listensock.SetBlocking(false) != 0) 
+		if(listensock.SetBlocking(false) != 0) 
         {
 			return -1;
 		}
 
 		listensock.SetDelay(false);
 
-		if ( listensock.GetLocalAddr(_addr) != 0 ) 
+		if( listensock.GetLocalAddr(_addr) != 0 ) 
         {
 			return -1;
 		}
 	}
 
-	if (GetEventManager()->RegisterHandler(ReadMask | PersistMask, this) != 0)
+	if(GetEventManager()->RegisterHandler(ReadMask | PersistMask, this) != 0)
 	{
-		if (newSocket) 
+		if(newSocket) 
         {
 			::close(GetEventObject().GetObject());
 			GetEventObject().SetInvalid();
@@ -112,9 +112,9 @@ int Acceptor::Close()
 
 void Acceptor::HandleClose()
 {
-	::close(int());
+	::close(GetEventObject().GetObject());
 
-    if (_addr.GetFamily() == AF_LOCAL || _addr.GetFamily() == AF_FILE) 
+    if(_addr.GetFamily() == AF_LOCAL || _addr.GetFamily() == AF_FILE) 
     {
         ::remove(_addr.ToString().c_str());
     }
@@ -134,7 +134,7 @@ void Acceptor::HandleInput()
 	socklen_t addrlen = sizeof(stAddr);
 
 	int handle = ::accept(GetEventObject().GetObject(), (sockaddr*)&stAddr.generic, &addrlen);
-	if (handle == -1) 
+	if(handle == -1) 
     {
         LOG_ERROR("accpet socket error");
 		return;
@@ -145,18 +145,18 @@ void Acceptor::HandleInput()
     LOG_DEBUG("new client connect");
 	stRemoteAddr.Setsockaddr((sockaddr*)&stAddr);
 
-	if (OnAccept(handle, stRemoteAddr) != 0) {
+	if(OnAccept(handle, stRemoteAddr) != 0) {
 		return;
 	}
 
 	EventHandler* handler;
-	if ( (handler = CreateHandler(stRemoteAddr)) == NULL ) {
+	if( (handler = CreateHandler(stRemoteAddr)) == NULL ) {
 		return;
 	}
 
 	handler->SetEventObject(EventObject(handle));
 	handler->SetEventManager(GetEventManager());
-	if (handler->Open() != 0) 
+	if(handler->Open() != 0) 
     {
 		DestroyHandler(handler);
 		return;
@@ -175,5 +175,5 @@ void Acceptor::OnConnected(EventHandler *)
 {
 }
 
-} // namespace base
+} 
 

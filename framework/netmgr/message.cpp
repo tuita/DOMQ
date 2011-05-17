@@ -63,19 +63,6 @@ void LineMessage::ToStr(std::stringstream& st)const
     _MSG_SERIALISE_PROPERTY(st, line);
 }
 
-int LineMessage::ProtocolBufDecode(const char* buf, size_t len)
-{
-    LOG_DEBUG("decode msg:[%s]", base::Escape(buf, len).c_str());
-    line.assign(buf, len);
-    return 0;
-}
-
-int LineMessage::ProtocolBufEncode(char* buf, size_t len) const
-{
-    mempcpy(buf, line.c_str(), std::min(len, line.size()));
-    return std::min(len, line.size());
-}
-
 void ServiceMessage::ToStr(std::stringstream& st)const
 {
     Message::ToStr(st);

@@ -12,7 +12,6 @@ FIND_LIBRARY(LIBEVENT_LIB libevent.a ./libevent-1.3e/lib NO_DEFAULT_PATH)
  -Wunused-variable -Wunused-parameter -Wunused-function -Wunused
  -Wno-deprecated -Woverloaded-virtual -Wwrite-strings
  -D__WUR= -D_REENTRANT -D_FILE_OFFSET_BITS=64 -DTIXML_USE_STL
- -DAC_HAS_INFO -DAC_HAS_WARNING -DAC_HAS_ERROR -DAC_HAS_CRITICAL 
 )
 FIND_LIBRARY(LIB_THREAD pthread /usr/lib /usr/local/lib NO_DEFAULT_PATH)
 FIND_LIBRARY(LIB_RT rt /usr/lib /usr/local/lib NO_DEFAULT_PATH)

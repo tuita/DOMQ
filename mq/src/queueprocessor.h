@@ -88,7 +88,6 @@ private:
     int _removeOnceCount;
     int _sessionTime;
     int _heartBeatMs;
-
     int _controlFd;
 
 };

@@ -37,23 +37,24 @@ ConnectionMgr::~ConnectionMgr()
 
 int ConnectionMgr::Open(libconfig::Setting& setting)
 {
-	
     _requestLimit = size_t((int)setting["QueueLimit"]);
     _resultLimit = size_t((int)setting["PackageLimit"]);
     _eventMgr = new base::EventManager;
     _connectionThread.SetReactor(_eventMgr);
 
+    _extractMsgCallBack.SetQueue(&_requestQueue);
+
 	_newMsgCallBack.SetQueue(&_resultQueue);
 	_newMsgCallBack.SetHandlerRegistry(&_eventhandleRegistery);
     
     _newMsgEventHandler.SetEventManager(_eventMgr);
+    _newMsgEventHandler.SetEventCallBack(&_newMsgCallBack);
 	if (_newMsgEventHandler.Open() != 0)
 	{
 		LOG_ERROR("pushhandler open fail");
 		return -1;
 	}
     _queuePushMsgCallBack.SetPipe(_newMsgEventHandler.GetAnotherHandle());
-    
 	_resultQueue.SetPushCallBack(&_queuePushMsgCallBack);
 
     libconfig::Setting& acceptSetting = setting["NetworkAcceptors"];
@@ -67,26 +68,24 @@ int ConnectionMgr::Open(libconfig::Setting& setting)
 
 int ConnectionMgr::ParseCoder(NetworkOption& option, const libconfig::Setting& setting)
 {
-    
-
     std::string serviceName = setting.exists("ServiceName") ? (const char*)setting["ServiceName"] : "";
-    std::string translatorName = setting.exists("Coder") ? (const char*)setting["Coder"] : "";
+    std::string coderName = setting.exists("Coder") ? (const char*)setting["Coder"] : "";
     switch (option.protocol)
     {
     case JSON_PROTOCOL:
         {
-            if (translatorName == "")
+            if (coderName == "")
             {
                 option.coder = JsonCoder::Instance();
             }
-            else if (translatorName == "JSONRPC_PROTOCOL")
+            else if (coderName == "JSONRPC_PROTOCOL")
             {
                 option.coder = new JsonRpcCoder;
                 _coders.push_back(option.coder);
             }
             else
             {
-                LOG_ERROR("JSON_PROTOCOL, TRANSLATORNAME:[%s] is not implement", translatorName.c_str());
+                LOG_ERROR("JSON_PROTOCOL, TRANSLATORNAME:[%s] is not implement", coderName.c_str());
             }
             
             break;
@@ -101,7 +100,7 @@ int ConnectionMgr::ParseCoder(NetworkOption& option, const libconfig::Setting& s
         return -1;
     }
     
-    if (translatorName == "SERVICEFLAGTRANSLATOR")
+    if (coderName == "SERVICEFLAGTRANSLATOR")
     {
         ServiceFlagCoder* coder = new ServiceFlagCoder(base::NilMutex::Instance());
         coder->SetCoder(option.coder);
@@ -119,18 +118,16 @@ int ConnectionMgr::ParseCoder(NetworkOption& option, const libconfig::Setting& s
         }
         else
         {
-            LOG_WARN("protocol [%x], translator:[%s] is error", option.protocol, translatorName.c_str());
+            LOG_WARN("protocol [%x], translator:[%s] is error", option.protocol, coderName.c_str());
             return -1;
         }
     }
-
+    option.coder->SetExtractMsgCallBack(&_extractMsgCallBack);
     return 0;
 }
 
 int ConnectionMgr::InitNetwork(libconfig::Setting& acceptSetting)
 {
-    
-
     for ( int i=0; i<acceptSetting.getLength(); ++i ) 
     {
         NetworkOption stNetworkOption;
@@ -213,7 +210,7 @@ void ConnectionMgr::Run(bool Sync)
     _connectionThread.Start();
     if (Sync)
     {
-        _connectionThread.Join();
+        _connectionThread.Wait();
     } 
 }
 
@@ -258,12 +255,12 @@ Message* ConnectionMgr::PopMsg(bool block)
 Message* ConnectionMgr::PopMsg(int usBlockTime)
 {
     netmgr::Message* m;
-    return _requestQueue.Pop(m, usBlockTime) == 0 ? m: NULL;
+    return _requestQueue.Get(m, usBlockTime) == 0 ? m: NULL;
 }
 
 int ConnectionMgr::PushMsg(Message* msg)
 {
-	return _resultQueue.Push(msg);
+	return _resultQueue.Put(msg);
     //NetMgrEventHandler* eventHandler = dynamic_cast<NetMgrEventHandler*>(_eventhandleRegistery.GetHandler(msg->context.peer.addr));
     //if (NULL == eventHandler)
     //{

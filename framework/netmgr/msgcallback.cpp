@@ -8,9 +8,21 @@
 #include <netmgr/message.h>
 #include <sys/socket.h>
 #include <string>
+#include <cassert>
 
 namespace netmgr
 {
+
+int ExtractMsgCallBack::Call(void* p)
+{
+    if (_queue && p)
+    {
+        _queue->Put((Message*)p);
+        return 0;
+    }
+    return -1;
+    
+}
 
 int QueuePushMsgCallBack::Call(void* /*p*/)
 {
@@ -19,9 +31,18 @@ int QueuePushMsgCallBack::Call(void* /*p*/)
 
 int PushMsgCallBack::Call(void* /*p*/)
 {
+    assert(_registry);
+    assert(_queue);
     Message* m;
-    while (_queue->Pop(m, 0) == 0)
+    while (_queue->Get(m, 0) == 0)
     {
+        if (!m)
+        {
+            LOG_ERROR("recv from null msg to send");
+            continue;
+        }
+        
+        LOG_DEBUG("push msg:[%s] content:[%s], to client:[%s]", m->GetTypeName().c_str(), m->ToString().c_str(), m->context.peer.addr.c_str());
         gettimeofday(&m->context.gettime2, NULL);
         std::string addr = m->context.peer.addr;
         NetMgrEventHandler* handler = dynamic_cast<NetMgrEventHandler*>(_registry->GetHandler(addr));
@@ -40,6 +61,7 @@ int PushMsgCallBack::Call(void* /*p*/)
         {
             char buffer[1024*1024];
             ICoder * coder = handler->GetNetworkOption().coder;
+            assert(coder);
             int len = coder->Encode(buffer, sizeof(buffer)-1, m);
             if (len < 0)
             {

@@ -9,23 +9,24 @@ namespace base {
 class Thread : public NoCopyable
 {
 public:
-	Thread();
-	virtual ~Thread();
+	Thread():_threadHandle(0), _alive(false){};
+    virtual ~Thread();
+
 	virtual int Start();
 	virtual void Stop();
-	void Join();
+	void Wait();
 
-	inline bool IsAlive() const { return _alive; }
-	inline pthread_t ThreadId() const { return _hdl; }
+	inline bool Alive() const { return _alive; }
+	inline pthread_t ThreadId() const { return _threadHandle; }
 
-private:
+protected:
 	virtual void Run() = 0;	
 
 private:
-	pthread_t _hdl;
-	bool _alive;
 
-	friend void* __THREAD_FUNC(void* p);
+    static void* ThreadFunc(void*p);
+	pthread_t _threadHandle;
+	bool _alive;
 };
 } 
 

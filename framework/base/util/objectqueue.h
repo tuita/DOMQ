@@ -22,9 +22,9 @@ public:
     void SetPopCallBack(CallBack* notify) { this->_popCallBack = notify; } 
 
 
-    int Push(const T& value, bool limit=true)
+    int Put(const T& value, bool limit=true)
     {
-        int ret = PushImp(value, limit);
+        int ret = PutImplement(value, limit);
         if ( ret == 0 && _pushCallBack) 
         {
             _pushCallBack->Call(this);
@@ -32,9 +32,9 @@ public:
         return ret;
     }
 
-    int Pop(T& value, int usBlockTime=-1)
+    int Get(T& value, int usBlockTime=-1)
     {
-        int ret = PopImp(value, usBlockTime);
+        int ret = GetImplement(value, usBlockTime);
         if(0 == ret && _popCallBack)
         {
             _popCallBack->Call(this);
@@ -46,9 +46,9 @@ public:
 
 protected:
 
-    virtual int PushImp(const T& value, bool limit=true) = 0;
+    virtual int PutImplement(const T& value, bool limit=true) = 0;
     
-    virtual int PopImp(T& value, int usBlockTime) = 0;
+    virtual int GetImplement(T& value, int usBlockTime) = 0;
 
 private:
     CallBack* _pushCallBack;
@@ -93,7 +93,7 @@ public:
 
 protected:
 
-    virtual int PushImp(const T& value, bool limit=true)
+    virtual int PutImplement(const T& value, bool limit=true)
     {
         pthread_mutex_lock(&_mutex);
 
@@ -110,7 +110,7 @@ protected:
         return 0;
     }
 
-    virtual int PopImp(T& value, int usBlockTime)
+    virtual int GetImplement(T& value, int usBlockTime)
     {
         int tmpUsBlockTime = usBlockTime >= 0 ? usBlockTime : 1000*1000;
         pthread_mutex_lock(&_mutex);
@@ -160,7 +160,7 @@ template <class T>
 class SyncObjectStack : public SyncObjectQueue<T>
 {
 protected:
-    virtual int PushImp(const T& value, bool limit=true)
+    virtual int PutImplement(const T& value, bool limit=true)
     {
         pthread_mutex_lock(&this->_mutex);
         

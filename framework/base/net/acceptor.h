@@ -13,8 +13,6 @@ public:
 
 	Acceptor();
 
-	Acceptor(int handle);
-	
 	Acceptor(const SockAddress & stSockAddr);
 
 	virtual ~Acceptor();
@@ -48,8 +46,7 @@ protected:
 	SockAddress _addr;
 };
 
+}
 
-} // namespace base
-
-#endif // AC_NETWORK_ACCEPTOR_H_
+#endif
 

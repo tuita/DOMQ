@@ -13,34 +13,7 @@ namespace base {
 class EventHandler;
 class EventData;
 
-class IEventManager : public NoCopyable
-{
-public:
-	IEventManager(){}
-	virtual ~IEventManager(){}
-
-	virtual int RegisterHandler(int mask, EventHandler* handler, timeval* timeout=0) = 0;
-
-	virtual int RemoveHandler(int mask, EventHandler* handler) = 0;
-
-	virtual int ScheduleTimer(EventHandler* handler, timeval* timeout, void ** pTimerID=NULL) = 0;
-
-	virtual int CancelTimer(EventHandler* handler, void * pTimerID=NULL /* cancel all Timers */) = 0;
-
-	virtual void Run();
-
-	virtual void Stop() { running = false; }
-
-    bool IsRunning() const { return running; }
-
-protected:
-    virtual int RunOnce() = 0 ; 
-
-private:
-	bool running;	
-};
-
-class EventManager : public IEventManager
+class EventManager : public NoCopyable
 {
 public:
     EventManager(IMemoryAllocator* allocator=NULL);
@@ -48,8 +21,8 @@ public:
 
     virtual int RegisterHandler(int mask, EventHandler* handler, timeval* timeout=0);
     virtual int RemoveHandler(int mask, EventHandler* handler);
-    virtual int ScheduleTimer(EventHandler* handler, timeval* timeout, void ** pTimerID=NULL);
-    virtual int CancelTimer(EventHandler* handler, void * pTimerID=NULL /* cancel all Timers */);
+    virtual int RegisterTimeHandler(EventHandler* handler, timeval* timeout, void ** pTimerID=NULL);
+    virtual int RemoveTimeHandler(EventHandler* handler, void * pTimerID=NULL /* cancel all Timers */);
 
     virtual void Run();
     virtual void Stop();

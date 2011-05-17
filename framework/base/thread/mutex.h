@@ -39,11 +39,25 @@ public:
 class ThreadMutex : public IMutex
 {
 public:
-	ThreadMutex();
-	virtual ~ThreadMutex();
+	ThreadMutex()
+    {
+        pthread_mutex_init(&mutex_, NULL);
+    }
+
+	virtual ~ThreadMutex()
+    {
+        pthread_mutex_destroy(&mutex_);
+    }
 	
-	virtual int Acquire(bool block=true) const;
-	virtual int Release() const;
+	virtual int Acquire(bool block=true) const
+    { 
+        return block ? pthread_mutex_lock(&mutex_) : pthread_mutex_trylock(&mutex_); 
+    }
+
+	virtual int Release() const
+    {
+        return pthread_mutex_unlock(&mutex_);
+    }
 
 private:
 	mutable pthread_mutex_t mutex_;
@@ -66,22 +80,12 @@ public:
 
     int AcquireRead(bool block=true) const
     {
-        if ( block ) {
-            return pthread_rwlock_rdlock(&_mutex);
-        }
-        else {
-            return pthread_rwlock_tryrdlock(&_mutex);
-        }
+        return block ? pthread_rwlock_rdlock(&_mutex) : pthread_rwlock_tryrdlock(&_mutex);
     }
 
     int AcquireWrite(bool block=true) const
     {
-        if ( block ) {
-            return pthread_rwlock_wrlock(&_mutex);
-        }
-        else {
-            return pthread_rwlock_trywrlock(&_mutex);
-        }
+        return block ? pthread_rwlock_wrlock(&_mutex) : pthread_rwlock_trywrlock(&_mutex);
     }
 
     int Release() const
@@ -95,5 +99,5 @@ private:
 
 }
 
-#endif // AC_MUTEX_H_
+#endif
 

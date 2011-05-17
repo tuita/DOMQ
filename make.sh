@@ -17,7 +17,7 @@ cmake .
 make
 
 cd ../mq/hiredis
-make
+make static
 
 cd ..
 cmake . 

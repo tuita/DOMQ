@@ -11,14 +11,14 @@
 #include <base/net/sockaddr.h>
 #include <base/thread/thread.h>
 #include <base/thread/mutex.h>
-#include <base/net/socketpairhandler.h>
+#include <base/net/pipeeventhandler.h>
 #include <base/config/libconfig.h++>
 #include <map>
 #include <list>
 #include <string>
 
 namespace base {
-    class IEventManager;
+    class EventManager;
     class Acceptor;
 }
 
@@ -30,11 +30,11 @@ class ConnectionThread: public base::Thread
 public:
     ConnectionThread();
 
-    void SetReactor(base::IEventManager* eventMgr){_eventMgr = eventMgr;}
+    void SetReactor(base::EventManager* eventMgr){_eventMgr = eventMgr;}
 private:
     void Run();
 
-    base::IEventManager* _eventMgr;
+    base::EventManager* _eventMgr;
 
 };
 
@@ -77,11 +77,12 @@ private:
     size_t                      _requestLimit;
     size_t                      _resultLimit;
     EventHandlerRegistry        _eventhandleRegistery;
+    ExtractMsgCallBack          _extractMsgCallBack;
     PushMsgCallBack             _newMsgCallBack;
     QueuePushMsgCallBack        _queuePushMsgCallBack;
-    base::SocketPairHandler     _newMsgEventHandler;
+    base::PipeEventHandler     _newMsgEventHandler;
 
-    base::IEventManager*        _eventMgr;
+    base::EventManager*        _eventMgr;
 
     base::GxxMemoryAllocator    _memAllocator;
     /*base::ObjectPoolAllocator<Package> packageAllocator;*/

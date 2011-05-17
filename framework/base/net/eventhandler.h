@@ -5,7 +5,7 @@
 
 namespace base {
 
-class IEventManager;
+class EventManager;
 
 enum EventMask
 {
@@ -25,9 +25,9 @@ public:
 
 	EventObject& GetEventObject() { return this->_eventObj; }
 
-	void SetEventManager(IEventManager* evMgr)	{ this->_eventMgr = evMgr; }
+	void SetEventManager(EventManager* evMgr)	{ this->_eventMgr = evMgr; }
 
-	IEventManager* GetEventManager() const { return this->_eventMgr; }
+	EventManager* GetEventManager() const { return this->_eventMgr; }
 
 
     void Context(void* data){ this->_context = data; }
@@ -44,11 +44,11 @@ public:
 
 protected:
     EventObject		_eventObj;
-    IEventManager*	_eventMgr;
+    EventManager*	_eventMgr;
     void*		_context;
 };
 
-} // namespace base
+}
 
-#endif // AC_NETWORK_EVENTHANDLER_H_
+#endif
 

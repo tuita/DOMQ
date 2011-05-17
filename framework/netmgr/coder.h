@@ -27,10 +27,12 @@ struct PortInfo
 class ICoder
 {
 public:
-    ICoder(base::CallBack* callback = NULL):_extractMsgCallback(callback) {}
+    ICoder(base::CallBack* callback = NULL):_headLen(4), _extractMsgCallback(callback) {}
     virtual ~ICoder(){}
+    void SetExtractMsgCallBack(base::CallBack* callback){ _extractMsgCallback = callback;}
     void SetHeadLen(size_t headLen){_headLen = headLen;}
-    int  Extract(const char* ptr, size_t len, const base::SockAddress& addr);
+
+    virtual int  Extract(const char* ptr, size_t len, const base::SockAddress& addr);
 	virtual Message* Decode(const char* buf, size_t len,  const PortInfo& portInfo) const=0 ;
 	virtual int Encode(char* buf, size_t len,  const Message* message) const = 0;
 
@@ -79,6 +81,7 @@ class LineCoder:public ICoder
 {
 public :
     static LineCoder* Instance();
+    virtual int Extract(const char* ptr, size_t len, const base::SockAddress& addr);
     virtual Message* Decode(const char* buf, size_t len,  const PortInfo& portInfo) const;
     virtual int Encode(char* buf, size_t len,  const Message* message) const; 
 };

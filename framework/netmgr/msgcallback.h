@@ -7,6 +7,14 @@ namespace netmgr
 {
 class EventHandlerRegistry;
 class Message;
+class ExtractMsgCallBack : public base::CallBack
+{
+public:
+    void SetQueue(base::ObjectQueue<Message*>* queue){_queue = queue;}
+    int Call(void* p);
+private:
+    base::ObjectQueue<Message*>* _queue;
+};
 
 class QueuePushMsgCallBack : public base::CallBack
 {
@@ -22,6 +30,7 @@ private:
 class PushMsgCallBack : public base::CallBack
 {
 public:
+    PushMsgCallBack():_registry(NULL), _queue(NULL){}
 	void SetHandlerRegistry(EventHandlerRegistry* registry)
 	{   this->_registry = registry; }
 

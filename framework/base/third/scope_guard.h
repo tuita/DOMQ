@@ -655,12 +655,11 @@ namespace base
 
 }
 
-#define BASE_CONCATENATE_DIRECT(s1, s2)  s1##s2
-#define BASE_CONCATENATE(s1, s2)         BASE_CONCATENATE_DIRECT(s1, s2)
-#define BASE_ANONYMOUS_VARIABLE(str)     BASE_CONCATENATE(str, __LINE__)
+#define BASE_CONSTR2_HELP(X, Y)  X##Y
+#define BASE_CONSTR3_HELP(X, Y,Z)  X##Y##Z
+#define BASE_CONSTR2(X, Y)  BASE_CONSTR2_HELP(X, Y)
+#define BASE_DECLARE_TMP(X)     BASE_CONSTR2(X, __LINE__)
+#define BASE_BLOCK_GUARD(...)      ::base::ScopeGuard BASE_DECLARE_TMP(tmp) = ::base::MakeGuard(__VA_ARGS__); ((void)BASE_DECLARE_TMP(tmp))
 
-#define BASE_ON_BLOCK_EXIT(...)      ::base::ScopeGuard BASE_ANONYMOUS_VARIABLE(scopeGuard) = ::base::MakeGuard(__VA_ARGS__); ((void)BASE_ANONYMOUS_VARIABLE(scopeGuard))
-#define BASE_ON_BLOCK_EXIT_OBJ(...)  ::base::ScopeGuard BASE_ANONYMOUS_VARIABLE(scopeGuard) = ::base::MakeObjGuard(__VA_ARGS__); ((void)BASE_ANONYMOUS_VARIABLE(scopeGuard))
-
-#endif // end file guardian
+#endif 
 

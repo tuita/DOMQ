@@ -1,8 +1,8 @@
-SET(LIBRARY_OUTPUT_PATH ../lib)
+SET(LIBRARY_OUTPUT_PATH ../lib )
 SET(EXECUTABLE_OUTPUT_PATH ../bin)
 include_directories(.. .)
 
-add_library(libmq
+add_library(libmq 
     msg/msgqueueerrno.cpp
     msg/msgqueuemsg.cpp
     queuemsgfactory.cpp

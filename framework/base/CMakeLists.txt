@@ -23,7 +23,7 @@ ADD_LIBRARY(base STATIC
     net/socket.cpp
     net/acceptor.cpp
     net/eventmanager.cpp
-    net/socketpairhandler.cpp
+    net/pipeeventhandler.cpp
     
     config/libconfig.c      
     config/libconfigcpp.cc  

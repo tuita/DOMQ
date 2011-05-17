@@ -13,11 +13,11 @@ MsgFactory.register("GetMsgResult", GetMsgResult);
 MsgFactory.register("SendMsgRequest", SendMsgRequest);
 MsgFactory.register("SendMsgResult", SendMsgResult);
 
-#HOST = "127.0.0.1";
-#PORT = 12010;
+HOST = "127.0.0.1";
+PORT = 12010;
 
-HOST = "10.241.12.117";
-PORT = 12510;
+#HOST = "10.241.12.117";
+#PORT = 12510;
 
 
 if __name__ == "__main__":

@@ -63,6 +63,8 @@ public:
     Message(base::CallBack* disposeCallBack = NULL):_disposeCallBack(disposeCallBack)
     {}
 
+    void SetDisposeCallBack(base::CallBack* callback){ _disposeCallBack = callback;}
+
     virtual ~Message(){}
 
     std::string GetTypeName() const;
@@ -124,10 +126,6 @@ class LineMessage:public Message
 {
 public :
     std::string line;
-
-    virtual int ProtocolBufEncode(char* buf, size_t len) const;
-    virtual int ProtocolBufDecode(const char* buf, size_t len);
-
     void ToStr(std::stringstream& st)const;
 };
 

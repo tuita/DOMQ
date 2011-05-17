@@ -40,18 +40,17 @@ int ICoder::Extract(const char* ptr, size_t len, const base::SockAddress& addr)
             LOG_DEBUG("extractor used:[%zd], data:[%s], len:[%zd], bodyLen:[%zd]", used, base::Escape(ptr, len).c_str(), len, bodyLen);
             return used;
         }
-        Message* m = Decode(ptr, bodyLen, addr);
-        if(0 != m)
+        Message* m = Decode(ptr+_headLen, bodyLen-_headLen, addr);
+        if(!m)
         {
             LOG_WARN("create package fail, no enough memory or allocator limit");
-            continue;
+            return -1;
         }
-
+        m->context.peer.addr = addr.ToString();
         if (_extractMsgCallback)
         {
             _extractMsgCallback->Call(m);
         }
-        
 
         ptr  += bodyLen;
         len  -= bodyLen;
@@ -102,7 +101,7 @@ Message* ServiceFlagCoder::Decode(const char* buf, size_t len, const PortInfo& p
     ServiceMessage* sMsg = dynamic_cast<netmgr::ServiceMessage*>(msg);
     if (!sMsg)
     {
-        base::LockGuard lock(_mutex);
+        base::MutexGuard lock(_mutex);
         (void)lock;
         LOG_DEBUG("serviceFlagCoder recv msg:[%s], not servicemessage", msg->GetTypeName().c_str());
         ServiceMsgInfo info;
@@ -111,7 +110,7 @@ Message* ServiceFlagCoder::Decode(const char* buf, size_t len, const PortInfo& p
         msg->serialNo = reqNo;
         return msg;
     }
-    BASE_ON_BLOCK_EXIT(&MappedMsgFactory::Destroy, *(GetGlobalMsgFactory()), msg);
+    BASE_BLOCK_GUARD(&MappedMsgFactory::Destroy, *(GetGlobalMsgFactory()), msg);
     Message* req = _internalCoder->Decode(sMsg->msgContent.c_str(), sMsg->msgContent.size(), portInfo);
     if (!req)
     {
@@ -124,7 +123,7 @@ Message* ServiceFlagCoder::Decode(const char* buf, size_t len, const PortInfo& p
     info.key = sMsg->key;
     info.service = sMsg->service;
     info.serialNo = sMsg->serialNo;
-    base::LockGuard lock(_mutex);
+    base::MutexGuard lock(_mutex);
     (void)lock;
     int reqNo = _requestManager.RegisterRequest(info);
     req->serialNo = reqNo;
@@ -136,14 +135,14 @@ int ServiceFlagCoder::Encode(char* buf, size_t len, const Message* message) cons
     assert(_internalCoder);
     assert(_coder);
     ServiceMsgInfo info;
-    base::LockGuard lock(_mutex);
+    base::MutexGuard lock(_mutex);
     (void)lock;
     if(0 != _requestManager.GetRequest(message->serialNo, info))
     {
         LOG_DEBUG("get msg no in request manager, seq:[%d]", message->serialNo);
         return _coder->Encode(buf, len, message);
     }
-    BASE_ON_BLOCK_EXIT(&ServiceFlagCoder::RequestManager::UnregisterRequest, _requestManager, message->serialNo);
+    BASE_BLOCK_GUARD(&ServiceFlagCoder::RequestManager::UnregisterRequest, _requestManager, message->serialNo);
 
     if (info.service=="" && info.key=="")
     {
@@ -170,14 +169,34 @@ LineCoder* LineCoder::Instance()
     static LineCoder translator;
     return &translator;
 }
+
+int LineCoder::Extract(const char* ptr, size_t len, const base::SockAddress& addr)
+{
+    size_t used = 0 ;
+    for (size_t i=0; i<len; ++i)
+    {
+        if(ptr[i]=='\n') 
+        {
+            Message* m = Decode(ptr+used, i-used+1, addr);
+            used = i+1;
+            if(!m)
+            {
+                LOG_WARN("create package fail, no enough memory or allocator limit");
+                return used;
+            }
+            m->context.peer.addr = addr.ToString();
+            if (_extractMsgCallback) _extractMsgCallback->Call(m);
+        }
+    }
+    return used;
+    
+}
 Message* LineCoder::Decode(const char* buf, size_t len, const PortInfo& /*portInfo*/) const
 {
-    LineMessage* msg = dynamic_cast<LineMessage*>(GetGlobalMsgFactory()->Create("LineMessage"));
-    if( 0 != msg->ProtocolBufDecode(buf, len))
+    LineMessage* msg = dynamic_cast<LineMessage*>(GetGlobalMsgFactory()->Create("netmgr::LineMessage"));
+    if(msg)
     {
-        LOG_ERROR("protocoldecode error, data:[%s]", base::Escape(buf, len).c_str());
-        GetGlobalMsgFactory()->Destroy(msg);
-        return NULL;
+        msg->line.assign(buf, len);
     }
     return msg;
 }
@@ -190,8 +209,8 @@ int LineCoder::Encode(char* buf, size_t len, const Message* message) const
         LOG_ERROR("LineCoder encode msg:[%s]", message->GetTypeName().c_str());
         return -1;
     }
-    int ret = msg->ProtocolBufEncode(buf, len);
-    return ret;
+    memcpy(buf, msg->line.c_str(), msg->line.size());
+    return msg->line.size();
 }
 
 JsonCoder* JsonCoder::Instance()
@@ -377,10 +396,10 @@ int JsonRpcCoder::Encode(char* buf, size_t len, const Message* message) const
         LOG_ERROR("data len:%zd, buf len:%zd", data.size(), len);
         return -1;
     }
-    int size = htonl(data.size()+4);
-    memcpy(buf, (const char*)&size, 4);
-    memcpy(buf+4, data.c_str(), data.size());
-    return 4+data.size();
+    int size = htonl(data.size()+_headLen);
+    memcpy(buf, (const char*)&size, _headLen);
+    memcpy(buf+_headLen, data.c_str(), data.size());
+    return _headLen+data.size();
 }
 
 int JsonRpcCoder::DecodeRequest(const Json::Value& obj, Request& req) const
@@ -389,15 +408,15 @@ int JsonRpcCoder::DecodeRequest(const Json::Value& obj, Request& req) const
     {
         return -1;
     }
-
     req.context.peer.msgId = obj["id"].asInt();
     return 0;
 }
 
-Message* JsonRpcCoder::Decode(const char* buf, size_t len, const PortInfo& /*portInfo*/) const
+Message* JsonRpcCoder::Decode(const char* buf, size_t len, const PortInfo& portInfo) const
 {
     Json::Reader reader;
     Json::Value  obj;
+    LOG_DEBUG("decode data:[%s]", base::Escape(buf, len).c_str());
     if (!reader.parse(std::string(buf, len), obj))
     {
         LOG_ERROR("parse json error, content:[%s]", base::Escape(buf, len).c_str());
@@ -428,7 +447,6 @@ Message* JsonRpcCoder::Decode(const char* buf, size_t len, const PortInfo& /*por
     {
         return NULL;
     }
-    
     guard.Dismiss();
     return msg;
 }

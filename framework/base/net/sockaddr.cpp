@@ -15,13 +15,13 @@ namespace base
 {
 
 SockAddress::SockAddress()
-   :   _string(), _len(0), _stAddr()
+   :_string(), _len(0), _addr()
 {
-   memset(&_stAddr, 0, sizeof(_stAddr));
+   memset(&_addr, 0, sizeof(_addr));
 }
 
 SockAddress::SockAddress(const sockaddr * pSockaddr)
-   :   _string(), _len(0), _stAddr()
+   :_string(), _len(0), _addr()
 {
    Setsockaddr(pSockaddr);
 }
@@ -30,11 +30,11 @@ void SockAddress::Setsockaddr(const sockaddr * pSockaddr)
 {
     if (AF_INET == pSockaddr->sa_family)
     {
-        _stAddr.in.sin_family = AF_INET;
+        _addr.in.sin_family = AF_INET;
         const sockaddr_in* sockaddin = (const sockaddr_in*)(pSockaddr);
-        _stAddr.in.sin_port = sockaddin->sin_port;
-        _stAddr.in.sin_addr = sockaddin->sin_addr;
-        _len = sizeof(_stAddr.in);
+        _addr.in.sin_port = sockaddin->sin_port;
+        _addr.in.sin_addr = sockaddin->sin_addr;
+        _len = sizeof(_addr.in);
         char ip[16] = {0};
         if(inet_ntop(AF_INET, &(sockaddin->sin_addr), ip, sizeof(ip))==NULL)
         {
@@ -52,10 +52,10 @@ void SockAddress::Setsockaddr(const sockaddr * pSockaddr)
     }
     else if (AF_LOCAL == pSockaddr->sa_family)
     {
-        _stAddr.un.sun_family = AF_LOCAL;
+        _addr.un.sun_family = AF_LOCAL;
         struct sockaddr_un* sockaddrun = (struct sockaddr_un*)(pSockaddr);
-        strncpy(_stAddr.un.sun_path, sockaddrun->sun_path, sizeof(_stAddr.un.sun_path) - 1);
-        _len = sizeof(_stAddr.un);
+        strncpy(_addr.un.sun_path, sockaddrun->sun_path, sizeof(_addr.un.sun_path) - 1);
+        _len = sizeof(_addr.un);
         _string.assign(sockaddrun->sun_path);
     }
     else
@@ -118,7 +118,7 @@ int SockAddress::SetAddr(const char* addr)
 
 std::string SockAddress::GetHost()
 {
-    if (_stAddr.generic.sa_family == AF_INET)
+    if (_addr.generic.sa_family == AF_INET)
     {
         return _string.substr(0, _string.find(":"));
     }
@@ -131,9 +131,9 @@ std::string SockAddress::GetHost()
 
 unsigned short SockAddress::GetPort()
 {
-    if (_stAddr.generic.sa_family == AF_INET)
+    if (_addr.generic.sa_family == AF_INET)
     {
-        return ntohs(_stAddr.in.sin_port);
+        return ntohs(_addr.in.sin_port);
     }
     else
     {

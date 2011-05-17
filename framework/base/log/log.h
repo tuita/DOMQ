@@ -251,8 +251,8 @@ namespace base
 
 #define LOG_FATAL base::Log::global_log.log_fatal
 #define LOG_ERROR base::Log::global_log.log_error
-#define LOG_WARN base::Log::global_log.log_warn
-#define LOG_INFO base::Log::global_log.log_info
+#define LOG_WARN  base::Log::global_log.log_warn
+#define LOG_INFO  base::Log::global_log.log_info
 #define LOG_TRACE base::Log::global_log.log_trace
 #define LOG_DEBUG base::Log::global_log.log_debug
 

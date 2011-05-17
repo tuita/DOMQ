@@ -45,8 +45,6 @@ int main(int ac, char ** av)
     signal(SIGCHLD, SIG_DFL);
     signal(SIGPIPE, SIG_IGN);
 
-    //AC_SET_DEFAULT_LOGGER(&base::OStreamLogger::StdoutLogger);
-
     netmgr::NetMgrMsgFactory factory;
     netmgr::GetGlobalMsgFactory()->RegisterFactory(&factory);
     QueueMsgFactory queueFactory;
@@ -65,16 +63,16 @@ int main(int ac, char ** av)
     processMgr->Uninit();
 
     /*QueueProcessor app(1);
-    #if( 0 != app.Open(configFile))
-    #{
-    #    printf("msg processor open error");
-    #    return -1;
-    #}
+    if( 0 != app.Open(configFile))
+    {
+        printf("msg processor open error");
+        return -1;
+    }
 
-    #app.Run();
+    app.Run();
 
-    #app.Close();
-*/
+    app.Close();*/
+
     return 0;
 
 }

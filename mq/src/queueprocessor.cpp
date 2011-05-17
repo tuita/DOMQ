@@ -159,21 +159,22 @@ void QueueProcessor::StopThreads(size_t stopcount)
     {
         netmgr::LineMessage* msg = new netmgr::LineMessage;
         msg->line = QueueCmd::EXITTHREAD;
-        _requestQueue.Push(msg);
+        _requestQueue.Put(msg);
     }
 }
 
 #define _PROCESS_MSG(MSGNAME, REQ_TYPE, RES_TYPE) if (MSGNAME == #REQ_TYPE)\
 {\
-    RES_TYPE res;\
+    RES_TYPE* res = (RES_TYPE*)netmgr::GetGlobalMsgFactory()->Create(#RES_TYPE);\
+    assert(res);\
     REQ_TYPE* req = dynamic_cast<REQ_TYPE*>(m);\
-    res.context = req->context;\
+    res->context = req->context;\
     LOG_DEBUG("recv msgname:[%s], msgdata:[%s]", req->GetTypeName().c_str(), req->ToString().c_str());\
-    int ret = ProcessMsg(*(req), res);\
+    int ret = ProcessMsg(*(req), *(res));\
     if(ret == 0)\
     {\
-    LOG_DEBUG("send msgname:[%s], msgdata:[%s]", res.GetTypeName().c_str(), res.ToString().c_str());\
-        _connMgr->PushMsg(&res);\
+    LOG_DEBUG("send msgname:[%s], msgdata:[%s]", res->GetTypeName().c_str(), res->ToString().c_str());\
+        _connMgr->PushMsg(res);\
         continue;\
     }\
     else if (ret < 0)\
@@ -220,7 +221,7 @@ void QueueProcessor::Run()
         else 
         {
             guard.Dismiss();
-            if(0 != _requestQueue.Push(m))
+            if(0 != _requestQueue.Put(m))
             {
                 LOG_ERROR("push request to queue error");
             }
@@ -233,7 +234,7 @@ bool QueueProcessor::RunOnce()
     while(true)
     {
         netmgr::Message* m = NULL;
-        if( 0!= _requestQueue.Pop(m, _heartBeatMs*1000))
+        if( 0!= _requestQueue.Get(m, _heartBeatMs*1000))
         {
             _queueMgr->Ping();
             continue;
@@ -243,7 +244,7 @@ bool QueueProcessor::RunOnce()
             LOG_DEBUG("pop msg null");
             continue;
         }
-        BASE_ON_BLOCK_EXIT(&netmgr::MappedMsgFactory::Destroy, *netmgr::GetGlobalMsgFactory(), m);
+        BASE_BLOCK_GUARD(&netmgr::MappedMsgFactory::Destroy, *netmgr::GetGlobalMsgFactory(), m);
         const std::string& msgName = m->GetTypeName();
         _PROCESS_MSG(msgName, GetMsgRequest, GetMsgResult)
         _PROCESS_MSG(msgName, SendMsgRequest, SendMsgResult)
@@ -395,7 +396,7 @@ int QueueProcessor::ProcessMsg(const netmgr::LineMessage& req, netmgr::LineMessa
     else if (0 == strncasecmp(line.c_str(), QueueCmd::STATUS, strlen(QueueCmd::STATUS)))
     {
         std::stringstream st;
-        st << "thread:" << livethreads.size() << std::endl; 
+        st << "thread:" << _livethreads.size() << std::endl; 
         res.line = st.str();
         return 0;
     }

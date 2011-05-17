@@ -1,179 +1,68 @@
 #include <base/thread/threadpool.h>
+#include <base/thread/mutexguard.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <algorithm>
+#include <cassert>
+
 
 namespace base {
 
-class JobThread : public Thread
+
+
+
+ThreadPool::WorkerThread::WorkerThread(ThreadPool* pool_): pool(pool_)
 {
-private:
-	ThreadPool* pool;
-
-public:
-	JobThread(ThreadPool* pool);
-
-	virtual void Run();
-};
-
-
-JobThread::JobThread(ThreadPool* pool_)
-: pool(pool_)
-{
-	
 }
 
-void JobThread::Run()
+void ThreadPool::WorkerThread::Run()
 {
-	while(true)
-	{
-		bool ret = pool->RunOnce();
-		if (!ret) // need to exit
-		{
-			break;
-		}
-	}
-
-	pool->DestroyThread(this);
+	while(!pool->Stop() && pool->RunOnce());
+	pool->Destory(this);
 }
 
-ThreadPool::ThreadPool() : stopcount(0)
+Thread* ThreadPool::Create()
 {
-	
-	pthread_mutex_init(&mutex, NULL);
+	return new WorkerThread(this);
 }
 
-ThreadPool::~ThreadPool()
+void ThreadPool::Destory(const Thread* thread)
 {
-	
-	pthread_mutex_destroy(&mutex);
+    base::MutexGuard guard(&_mutex);
+    guard.Lock();
+    ThreadContainer::iterator it = std::find(_livethreads.begin(), _livethreads.end(), thread);
+    assert(it != _livethreads.end());
+    _livethreads.erase(it);
 }
 
-Thread* ThreadPool::CreateThread()
-{
-	
-
-	return new JobThread(this);
-}
-
-void ThreadPool::DestroyThread(Thread* thread)
-{
-
-	pthread_mutex_lock(&mutex);
-	ThreadPtrContainer::iterator iter = find(livethreads.begin(), livethreads.end(), thread);
-	if ( iter != livethreads.end() ) {
-		livethreads.erase(iter);
-	}
-
-	deadthreads.push_back(thread);
-	pthread_mutex_unlock(&mutex);
-}
 
 int ThreadPool::Start(size_t count)
 {
-	
-
-	size_t livecount = livethreads.size();
-
+	size_t livecount = _livethreads.size();
 	if ( livecount < count )
 	{
 		while( livecount < count )
 		{
-			Thread* thread = CreateThread();
+			Thread* thread = Create();
 			if (thread->Start() != 0)
 			{
 				return -1;
 			}
-			livethreads.push_back(thread);
+			_livethreads.push_back(thread);
 			++livecount;
 		}
 	}
-	else if ( livecount > count ) {
-		Stop(livecount-count);
-	}
-
 	return 0;
-}
-
-void ThreadPool::Stop(size_t count)
-{
-	
-
-	if ( count == 0 ) {
-		return;
-	}
-
-	size_t stopcount = ::std::min(count, livethreads.size());
-
-	StopThreads(stopcount);
-
-	// wait for exiting of all stopcount thread
-	while( true ) {
-
-		usleep(20);
-
-		pthread_mutex_lock(&mutex);
-		if ( deadthreads.size() >= stopcount || livethreads.empty() ) {
-			pthread_mutex_unlock(&mutex);
-			break;
-		}
-		pthread_mutex_unlock(&mutex);
-	}
-
-	for ( ThreadPtrContainer::iterator iter=deadthreads.begin(); iter!=deadthreads.end(); ++iter ) {
-		(*iter)->Join();
-		delete *iter;
-	}
-
-	deadthreads.clear();
-	return;
 }
 
 void ThreadPool::StopAll()
 {
-	
-
-	Stop(livethreads.size());
+	_stop = true;
 }
 
 size_t ThreadPool::GetThreadNum()
 {
-	
-
-	return livethreads.size();
-}
-
-
-bool ThreadPool::RunOnce()
-{
-	
-
-	while ( true ) {
-
-		usleep(1000000);
-
-		if ( stopcount > 0 ) {
-
-			pthread_mutex_lock(&mutex);
-
-			if ( this->stopcount > 0 ) {
-				--stopcount;
-				pthread_mutex_unlock(&mutex);
-				break;
-			}
-
-			pthread_mutex_unlock(&mutex);
-		}
-	}
-
-	return false;
-}
-
-void ThreadPool::StopThreads(size_t stopcount)
-{
-	
-
-	this->stopcount = stopcount;
+	return _livethreads.size();
 }
 
 }

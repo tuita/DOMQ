@@ -9,13 +9,13 @@ namespace base {
 
 class ThreadLocal
 {
-private:
-	pthread_key_t key;
-
 public:
 	ThreadLocal(CLEANUP_FUNC func);
 	int Set(void* p);
 	void* Get();
+
+private:
+    pthread_key_t key;
 };
 
 }

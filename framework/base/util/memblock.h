@@ -16,33 +16,28 @@ public:
 public:
 
 	MemBlock(size_t iSize = DEFAULT_SIZE, IMemoryAllocator *pAllocator = GxxMemoryAllocator::Instance());
-	MemBlock(const MemBlock &);
+	MemBlock(const MemBlock & memblock);
 	~MemBlock();
 
-	void Swap(MemBlock &);
+	void Swap(MemBlock & memblock);
 	int Resize(size_t iSize);
-	inline void Clear() { _end = _begin; }
+	void Clear() { _end = _begin; }
 
+	int Copy(const char* pDestBuffer, const char* pSrcBuffer, size_t iSize);
+	int Append(const char* pSrcBuffer, size_t iSize) { return Copy(_end, pSrcBuffer, iSize); }
+    int AddSpace(size_t iSize);
+    int ReduceSpace(size_t iSize);
 
-	int IncEnd(size_t iSize);
-	int DecEnd(size_t iSize);
+	char* GetBegin() { return _begin; }
+	const char* GetBegin() const { return _begin; }
+	const char* GetEnd() const { return _end; }
+	bool Empty() const { return _begin == _end; }
+	bool Full() const { return _end == _blockEnd; }
+	size_t Size() const  { return _end - _begin; }
 
-	int Copy(char* pDestBuffer, const char* pSrcBuffer, size_t iSize);
-	inline int Append(const char* pSrcBuffer, size_t iSize) { return Copy(GetEnd(), pSrcBuffer, iSize); }
-	int Erase(char* pBegin, char* pEnd);
-
-
-	inline char* GetBegin() { return _begin; }
-	inline char* GetEnd() { return _end; }
-	inline const char* GetBegin() const { return _begin; }
-	inline const char* GetEnd() const { return _end; }
-	inline bool IsInit() const { return GetBegin() != NULL; }
-	inline bool IsEmpty() const { return GetBegin() == GetEnd(); }
-	inline bool IsFull() const { return GetEnd() == _blockEnd; }
-	inline size_t GetSize() const  { return GetEnd() - GetBegin(); }
-	inline size_t GetLength() const  { return GetSize(); }
-	inline size_t GetAvailable() const { return _blockEnd - GetEnd(); }
-	inline size_t GetCapacity() const  { return _blockEnd - GetBegin(); }
+protected:
+	size_t FreeSpace() const { return _blockEnd - GetEnd(); }
+	size_t TotalSpace() const  { return _blockEnd - GetBegin(); }
 
 
 private:

@@ -37,7 +37,7 @@ void processMsg(netmgr::ConnectionMgr& mgr)
             LOG_ERROR("popmsg error");
             continue;
         }
-        BASE_ON_BLOCK_EXIT(&netmgr::MappedMsgFactory::Destroy, *netmgr::GetGlobalMsgFactory(), m);
+        BASE_BLOCK_GUARD(&netmgr::MappedMsgFactory::Destroy, *netmgr::GetGlobalMsgFactory(), m);
         assert(m);
         LOG_DEBUG("recv msg:%s, content:%s", m->GetTypeName().c_str(), m->ToString().c_str());
         std::string msgName = m->GetTypeName();

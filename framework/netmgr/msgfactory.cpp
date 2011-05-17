@@ -10,7 +10,7 @@ std::list<std::string> NetMgrMsgFactory::KnownTypes() const
     std::list<std::string> result;
     result.push_back("netmgr::ServiceMessage");
     result.push_back("netmgr::LineMessage");
-    result.push_back("IndexMsg");
+    result.push_back("netmgr::IndexMsg");
     return result;
     
 }
@@ -21,8 +21,8 @@ std::list<std::string> NetMgrMsgFactory::KnownTypes() const
     }
 Message* NetMgrMsgFactory::Create(const char* type)
 {
-    NAME2OBJ(ServiceMessage)
-    NAME2OBJ(LineMessage)
+    NAME2OBJ(netmgr::ServiceMessage)
+    NAME2OBJ(netmgr::LineMessage)
 
     return NULL;
 }

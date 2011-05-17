@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <base/thread/mutex.h>
 #include <base/thread/mutexguard.h>
+#include <base/util/callback.h>
 #include <list>
 #include <vector>
 
@@ -68,7 +69,7 @@ class ObjectPoolAllocator : public ObjectAllocator<T>
 {
 public:
 
-    ObjectPoolAllocator(size_t iInitNum, size_t iMaxNum=0, size_t iIncNum=0, IMutex * pMutex=NilMutex::Instance(), IMemoryAllocator *pAllocator=GxxMemoryAllocator::Instance())
+    ObjectPoolAllocator(size_t iInitNum, size_t iMaxNum=0, size_t iIncNum=120, IMutex * pMutex=NilMutex::Instance(), IMemoryAllocator *pAllocator=GxxMemoryAllocator::Instance())
         : _allocator(pAllocator), _mutex(pMutex), _currentNum(0), _maxNum(iMaxNum), _onceIncNum(iIncNum)
     {
         if ( _maxNum < iInitNum ) {
@@ -107,13 +108,15 @@ public:
 
     virtual T * Create()
     {
-        base::LockGuard lock(_mutex);
-        if ( lock.Lock(true) != 0 ) {
+        base::MutexGuard lock(_mutex);
+        if ( lock.Lock(true) != 0 ) 
+        {
             return NULL;
         }
 
         if ( _freeObject.empty() ) {
-            if ( inc(_onceIncNum) != 0 ) {
+            if ( inc(_onceIncNum) != 0 ) 
+            {
                 return NULL;
             }
         }
@@ -126,12 +129,14 @@ public:
 
     virtual void Destroy(T * pObject)
     {
-        LockGuard lock(_mutex);
-        if ( lock.Lock(true) != 0 ) {
+        MutexGuard lock(_mutex);
+        if ( lock.Lock(true) != 0 ) 
+        {
             return;
         }
 
-        if ( pObject != NULL ) {
+        if ( pObject != NULL ) 
+        {
             _freeObject.push_front(pObject);
         }
     }
@@ -140,20 +145,24 @@ private:
 
     int inc(size_t iIncNum)
     {
-        if ( _currentNum >= _maxNum ) {
+        if ( _currentNum >= _maxNum )
+        {
             return -1;
         }
 
-        if ( _currentNum + iIncNum > _maxNum ) {
+        if ( _currentNum + iIncNum > _maxNum ) 
+        {
             iIncNum = _maxNum - _currentNum;
         }
 
         T * pChunk = (T *)_allocator->Create(sizeof(T)*iIncNum);
-        if ( pChunk == NULL ) {
+        if ( pChunk == NULL ) 
+        {
             return -1;
         }
 
-        for ( size_t i=0; i<iIncNum; ++i ) {
+        for ( size_t i=0; i<iIncNum; ++i ) 
+        {
             T* p = new((void *)(pChunk+i)) T;
             _freeObject.push_back(p);
         }
@@ -174,6 +183,37 @@ private:
     size_t		_currentNum;
     size_t		_maxNum;
     size_t		_onceIncNum;
+};
+
+template <typename T>
+class ObjectPoolCallBackAllocator: public ObjectPoolAllocator<T>, public CallBack
+{
+public:
+    ObjectPoolCallBackAllocator(size_t iInitNum, size_t iMaxNum=0, size_t iIncNum=120, IMutex * pMutex=NilMutex::Instance(), IMemoryAllocator *pAllocator=GxxMemoryAllocator::Instance())
+        : ObjectPoolAllocator<T>(iInitNum, iMaxNum, iIncNum, pMutex, pAllocator)
+    {
+
+    }
+public:
+    virtual T * Create()
+    {
+        T* o = ObjectPoolAllocator<T>::Create();
+        o->SetDisposeCallBack(this);
+        return o;
+    }
+
+    int Call(void* p)
+    {
+        if(p)
+        {
+            this->Destroy((T*)p);
+            return 0;
+        }
+        return -1;
+        
+    }
+
+
 };
 
 
